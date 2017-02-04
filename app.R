@@ -1,4 +1,4 @@
-## Interactive app to calculate cumulative process mass intensity (PMI) for a synthetic sequence
+## Interactive app to calculate cumulative PMI for a synthetic sequence
 # December 2016 
 # Jacob Albrecht, Bristol-Myers Squibb
 
@@ -23,7 +23,7 @@ pmi.calc<-function(conv.df,N.iter=5000,z=5.15,correlation=-0.53){
   A.high<-A
   nr<-nrow(A.low)
   nc<-ncol(A.low)  # nr==nc , because the matrix should be square
-  A.mc<-array(rep(A,N.iter),dim=c(nr,nc,N.iter))  # giant matrix of all conditions to be zolved
+  A.mc<-array(rep(A,N.iter),dim=c(nr,nc,N.iter))  # giant matrix of all conditions to be solved
   # identify product from gap in labels
   prod<-all.labs[which(!all.labs %in% conv.df$inlabels)]
   
@@ -50,12 +50,15 @@ pmi.calc<-function(conv.df,N.iter=5000,z=5.15,correlation=-0.53){
     mean.pmi = mean(c(conv.df$yield.high[rp],conv.df$yield.low[rp]))
     sd.pmi = diff(c(conv.df$yield.high[rp],conv.df$yield.low[rp]))/z
     
+
     # for debuggin
     #print(mean.pmi)
     #print(mean.yield)
     
     # pull the MC samples: (new)
     yield.pmi.mc <- mv.samples(mean.yield,sd.yield,mean.pmi,sd.pmi,correlation,N.iter=N.iter)
+
+    
     
     #print(head(yield.pmi.mc))
     yield.mc[r,]<-sapply(yield.pmi.mc[,1],function(x){min(c(x,1))}) # cap yield at 100%
@@ -67,8 +70,14 @@ pmi.calc<-function(conv.df,N.iter=5000,z=5.15,correlation=-0.53){
       if (in.lab != "Waste"){
         i<-which(conv.df$outlabels==out.lab & conv.df$inlabels==in.lab) # i should be unique! - the index in the input dataframe
         c<-which(conv.df$inlabels[i]==all.labs) # the index in the A matrix 
+        
+        mean.stoich = mean(c(conv.df$stoich.high[i],conv.df$stoich.low[i]))
+        sd.stoich = (conv.df$stoich.high[i]-conv.df$stoich.low[i])/z
+        #print(sd.stoich)
+        stoich.mc <- abs(rnorm(N.iter,mean=mean.stoich,sd=sd.stoich))  # hack to enforce positive stoich
+        #print(summary(stoich.mc))
       
-      rm.mc<- conv.df$mw.in[i]/(conv.df$mw.out[i]*yield.mc[r,])*conv.df$stoich[i]
+        rm.mc<- conv.df$mw.in[i]/(conv.df$mw.out[i]*yield.mc[r,])*stoich.mc
       A.mc[c,r,]<- -1*rm.mc # put RM data into A matrix
       S.mc<- S.mc-rm.mc # as the RM values are calculated, subtrac tthesee from PMI to equal S wehn the loop is done
       }
@@ -80,7 +89,7 @@ pmi.calc<-function(conv.df,N.iter=5000,z=5.15,correlation=-0.53){
   b<-matrix(rep(0,n),nrow=n)
   b[prod==all.labs]<-1 # product is set to 1 kg basis
   
-  # TODO: error checking on graph, no loops, no duplicate conversions, one and only one product, nodes labeled "waste" etc.
+  # TODO: error/negative value checking on graph, no loops, no duplicate conversions, one and only one product, nodes labeled "waste" etc.
 
   # solve linear algebra
   soln.mc<-apply(A.mc,3,FUN=function(X){solve(X,b)})
@@ -94,8 +103,8 @@ pmi.calc<-function(conv.df,N.iter=5000,z=5.15,correlation=-0.53){
   #print(summary(t(step.pmi)))
 
   row.names(soln.mc)<-all.labs
-  print(dim(yield.mc))
-  print((all.labs))
+  #print(dim(yield.mc))
+  #print((all.labs))
   row.names(yield.mc)<-all.labs
   row.names(step.pmi)<-all.labs
   #print(summary(t(soln.mc)))
@@ -163,11 +172,13 @@ tabPanel("3. Results",
 )
 
 server <- shinyServer(function(input, output,session) {
+  # initial value for features:
   features <- reactiveValues(renderd=c(1,2,3),
                              conv.range=data.frame(row.names=c("B",'D'),low=c(0.5,0.5),high=c(0.95,0.95)),
                              inlabels=c('A','B','C'),
                              outlabels=c('B','D','D'),
-                             stoich=c(1,1,1),
+                             stoich.low=c(1,1,1),
+                             stoich.high=c(1,1,1),
                              pmi.range=data.frame(row.names=c("B",'D'),low=c(10,30),high=c(30,100)))
   
   df <- eventReactive(input$goButton, {
@@ -175,7 +186,8 @@ server <- shinyServer(function(input, output,session) {
     print(features$renderd)
     conv.out <- lapply(features$renderd,function(i){
       
-      sv<- paste0('stoich_',i)
+      svl<- paste0('stoich.low_',i)
+      svh<- paste0('stoich.high_',i)
       vn <- paste0('InLabel',i)
       vo <- paste0('OutLabel',i)
       mwn<- paste0('mw_',input[[vn]])
@@ -196,7 +208,8 @@ server <- shinyServer(function(input, output,session) {
                    outlabels=input[[vo]], 
                    mw.in=input[[mwn]],
                    mw.out=input[[mwo]],
-                   stoich=input[[sv]],
+                   stoich.low=input[[svl]],
+                   stoich.high=input[[svh]],
                    yield.low=input[[fv]][1],
                    yield.high=input[[fv]][2])
          #in.per.out.low=input[[mwn]]/(input[[mwo]]*input[[fv]][2])*input[[sv]],
@@ -204,16 +217,22 @@ server <- shinyServer(function(input, output,session) {
     })
     
     pmi.out <- lapply(seq(all.labs),function(i){
-      pv<-paste0('pmi_',all.labs[i])
-      if (pv %in% names(input)){
+      # get ids of PMI inputs
+      pv.min<-paste0('pmi_min_',all.labs[i])
+      pv.max<-paste0('pmi_max_',all.labs[i])
+      
+      #verify that PMI values are in input list, and create entry for "WASTE"
+      if ((pv.min %in% names(input)) & (pv.max %in% names(input))){
       # "Waste" is considered as input to get the matrix created correctly
       data.frame(outlabels=as.character(all.labs[i]),
                  inlabels='Waste',
                  mw.in=NA,
                  mw.out=NA,
-                 stoich=NA,
-                 yield.low=input[[pv]][1],
-                 yield.high=input[[pv]][2])
+                 stoich.low=NA,
+                 stoich.high=NA,
+                 yield.low=input[[pv.min]],
+                 yield.high=input[[pv.max]]
+                 )
                  #in.per.out.low=input[[pv]][1],
                  #in.per.out.high=input[[pv]][2])
         
@@ -273,15 +292,16 @@ server <- shinyServer(function(input, output,session) {
   output$downloadData <- downloadHandler(
     filename='MC_results.csv',
     content=function(con){
-      write.csv(df(),con)
+      write.csv(df()[2]$mc,con)
     }
   )
   
   output$OverallPMI <- renderPlot({
     mcsamps<-df()[2]$mc
+    conv.df<-df()[5]$conv.df
     print(summary(t(mcsamps)))
     m<-data.frame(t(mcsamps))
-    m$pmi<-apply(m,1,sum)-1
+    m$pmi<-apply(m,1,sum)-apply(m[names(m) %in% unique(conv.df$outlabels)],1,sum)
     Cumulative_PMI<-m$pmi
     Cpmi_mean <- round(mean(Cumulative_PMI),1)
     Cpmi_conf_left  <- round(quantile(Cumulative_PMI,c(0.025,0.975))[1],1)
@@ -318,8 +338,10 @@ server <- shinyServer(function(input, output,session) {
       #fv <- paste0('conv_',i)
       vn <- paste0('InLabel',i)
       vo <- paste0('OutLabel',i)
-      sv<- paste0('stoich_',i)
-      data.frame(inlabels=input[[vn]],outlabels=input[[vo]],stoich=input[[sv]])#, conv.low=input[[fv]][1],conv.high= input[[fv]][2])
+      svl<- paste0('stoich.low_',i)
+      svh<- paste0('stoich.high_',i)
+      data.frame(inlabels=input[[vn]],outlabels=input[[vo]],
+                 stoich.low=input[[svl]],stoich.high=input[[svh]])
     })
     
     df<-do.call(rbind,out)
@@ -329,7 +351,8 @@ server <- shinyServer(function(input, output,session) {
     #print(c(features$inlabels,features$outlabels))
     
     features$renderd <- c(features$renderd, length(features$renderd)+1)
-    features$stoich <- c(df$stoich,1)
+    features$stoich.low <- c(df$stoich.low,1)
+    features$stoich.high <- c(df$stoich.high,1)
     #print(features$renderd)
     #print(names(features))
     #features$conv.low <- c(df$conv.low,0.5)
@@ -342,16 +365,19 @@ server <- shinyServer(function(input, output,session) {
     out <- lapply(features$renderd,function(i){
       #fv <- paste0('conv_',i)
       vn <- paste0('InLabel',i)
-      sv<- paste0('stoich_',i)
+      svl<- paste0('stoich.low_',i)
+      svh<- paste0('stoich.high_',i)
       vo <- paste0('OutLabel',i)
-      data.frame(inlabels=input[[vn]],outlabels=input[[vo]],stoich=input[[sv]])#, conv.low=input[[fv]][1],conv.high= input[[fv]][2] )
+      data.frame(inlabels=input[[vn]],outlabels=input[[vo]],
+                 stoich.low=input[[svl]],stoich.high=input[[svh]])#, conv.low=input[[fv]][1],conv.high= input[[fv]][2] )
     })
     df<-do.call(rbind,out)
     print(df)
     if (nrow(df)>0){
       features$outlabels <- as.character(df$outlabels)
       features$inlabels <- as.character(df$inlabels)
-      features$stoich <- df$stoich
+      features$stoich.low <- df$stoich.low
+      features$stoich.high <- df$stoich.high
       #features$conv.low <- df$conv.low
      # features$conv.high <- df$conv.high
      # browser()
@@ -363,14 +389,17 @@ server <- shinyServer(function(input, output,session) {
       #fv <- paste0('conv_',i)
       vn <- paste0('InLabel',i)
       vo <- paste0('OutLabel',i)
-      sv<- paste0('stoich_',i)
-      data.frame(inlabels=input[[vn]],outlabels=input[[vo]],stoich=input[[sv]])#, conv.low=input[[fv]][1],conv.high= input[[fv]][2] )
+      svl<- paste0('stoich.low_',i)
+      svh<- paste0('stoich.high_',i)
+      data.frame(inlabels=input[[vn]],outlabels=input[[vo]],
+                 stoich.low=input[[svl]],stoich.high=input[[svh]])
     })
     df<-do.call(rbind,out)
     if (nrow(df)>0){
       features$outlabels <- as.character(df$outlabels)
       features$inlabels <- as.character(df$inlabels)
-      features$stoich <- df$stoich
+      features$stoich.low <- df$stoich.low
+      features$stoich.high <- df$stoich.high
      # features$conv.low <- df$conv.low
      #features$conv.high <- df$conv.high
     }
@@ -391,7 +420,8 @@ grViz(g1$dot_code)
         fluidRow(
           # duplicate choices make selectize poop the bed, use unique():
           
-          column(3,numericInput(paste0('stoich_',i),label='Stoichiometry',value=features$stoich[i])),
+          column(2,numericInput(paste0('stoich.low_',i),label='Stoichiometry Range: Low',value=features$stoich.low[i])),
+          column(2,numericInput(paste0('stoich.high_',i),label='Stoichiometry Range: High',value=features$stoich.high[i])),
           column(3,  selectizeInput(paste0('InLabel',i), 
                                     label = 'Input Name',selected=features$inlabels[i],
                                     choices=unique(c(features$inlabels,features$outlabels,toupper(letters))),#unique(c(features$inlabels[i],features$outlabels[!features$outlabels %in% features$inlabels])),
@@ -427,15 +457,21 @@ grViz(g1$dot_code)
                               label=paste0("MW of ",
                                            all.labs[i]," : "),
                               value = isolate(input[[paste0('mw_',all.labs[i])]]))),
-          column(3,
-                 sliderInput(paste0('pmi_',all.labs[i]), 
-                             label=paste0("Step PMI, kg/kg Product ",
-                                          all.labs[i], " : "),
-                             min = 0, max = 200, value = c(features$pmi.range[pmi.ix,'low'],
-                                                           features$pmi.range[pmi.ix,'high'])
+          column(2,
+                 numericInput(paste0('pmi_min_',all.labs[i]), 
+                             label=paste0("Step PMI, kg/kg Product",
+                                          all.labs[i], " (Min) : "),
+                             min = 0, max = 2000, value = isolate(input[[paste0('pmi_min_',all.labs[i])]])
                              )
                  ),
-          column(3,  sliderInput(paste0('conv_',all.labs[i]), label="Molar Yield",min = 0.2, max =1, step=0.05, 
+          column(2,
+                 numericInput(paste0('pmi_max_',all.labs[i]), 
+                              label=paste0("Step PMI, kg/kg Product",
+                                           all.labs[i], " (Max) : "),
+                              min = 0, max = 2000, value = isolate(input[[paste0('pmi_max_',all.labs[i])]])
+                 )
+                 ),
+          column(3,  sliderInput(paste0('conv_',all.labs[i]), label="Molar Yield",min = 0.0, max =1, step=0.01, 
                                  value = c(features$conv.range[pmi.ix,'low'],
                                            features$conv.range[pmi.ix,'high']))
                  )

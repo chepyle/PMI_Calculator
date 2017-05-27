@@ -96,21 +96,14 @@ pmi.calc <- function(conv.df,
                   conv.df$inlabels == in.lab) # i should be unique! - the index in the input dataframe
         c <-
           which(conv.df$inlabels[i] == all.labs) # the index in the A matrix
-        
-        mean.stoich = mean(c(conv.df$stoich.high[i], conv.df$stoich.low[i]))
-        sd.stoich = (conv.df$stoich.high[i] - conv.df$stoich.low[i]) / z
-        #print(sd.stoich)
-        stoich.mc <-
-          abs(rnorm(N.iter, mean = mean.stoich, sd = sd.stoich))  # hack to enforce positive stoich
+        stoich.mc <- runif(N.iter,min=conv.df$stoich.high[i], max=conv.df$stoich.low[i])  # uniform sampling for stoich
         #print(summary(stoich.mc))
-        
         rm.mc <-
           conv.df$mw.in[i] / (conv.df$mw.out[i] * yield.mc[r, ]) * stoich.mc
         A.mc[c, r, ] <- -1 * rm.mc # put RM data into A matrix
         S.mc <-
           S.mc - rm.mc # as the RM values are calculated, subtrac tthesee from PMI to equal S wehn the loop is done
       }
-      
       A.mc[w, r, ] <- -S.mc # put S values into A matrxi
     }
   }
@@ -209,7 +202,11 @@ ui <- shinyUI(navbarPage(
       numericInput('correlation', 'PMI/Yield Correlation', value =
                      -0.53),
       actionButton("goButton", "Calculate!"),
-      downloadButton('downloadData', 'Download')
+      br(),
+      br(),
+      downloadButton('downloadSpec', 'Download Process PMI Info'),
+      br(),
+      downloadButton('downloadData', 'Download Monte Carlo Results')
     ),
     mainPanel(tabsetPanel(
       tabPanel(
@@ -307,6 +304,7 @@ server <- shinyServer(function(input, output, session) {
     processinfo <-
       temp.df#cbind(temp.df,data.frame(out.per.in.high=1/temp.df$in.per.out.low))
     # do the MC calculation and return the resulting list of values into df():
+    print(processinfo) # spit out information for process
     pmi.calc(processinfo,
              N.iter = input$N.iter,
              correlation = input[['correlation']])
@@ -358,10 +356,18 @@ server <- shinyServer(function(input, output, session) {
     
   })
   
+  # buttons to download data
   output$downloadData <- downloadHandler(
     filename = 'MC_results.csv',
     content = function(con) {
       write.csv(df()[2]$mc, con)
+    }
+  )
+  
+  output$downloadSpec <- downloadHandler(
+    filename = 'PMI_specification.csv',
+    content = function(con) {
+      write.csv(df()[5]$conv.df, con)
     }
   )
   
@@ -618,6 +624,7 @@ server <- shinyServer(function(input, output, session) {
                   high = 0.8
                 ))
       }
+      
       rows <- lapply(seq(all.labs), function(i) {
         if (all.labs[i] %in% unique(features$outlabels)) {
           pmi.ix <- all.labs[i] == row.names(features$pmi.range)
@@ -625,7 +632,8 @@ server <- shinyServer(function(input, output, session) {
           # a nested if statement to check that the Preset input exists AND it is one of the types,
           # this could be streamlined...
           # TODO: fix the overwriting of custom fields when other presets are used for other steps
-          if (!is.null(isolate(input[[paste0('Preset_', all.labs[i])]]))) {
+          # TODO: user experience of having all rows reset with a change to one row must be addressed, lots of isolate statements are used, do they work?
+          if (!is.null(isolate(input[[paste0('Preset_', all.labs[i])]]))) {  # the row has a preset
             if (isolate(input[[paste0('Preset_', all.labs[i])]]) %in% presets.df$Type) {
               ix <-
                 match(isolate(input[[paste0('Preset_', all.labs[i])]]), presets.df$Type)
@@ -633,17 +641,18 @@ server <- shinyServer(function(input, output, session) {
               pmi_max_value <- presets.df$PMI_high[ix]
               yield_min_max_value <-
                 c(presets.df$Yield_low[ix], presets.df$Yield_high[ix])
-            }else{
-              pmi_min_value <- (input[[paste0('pmi_min_', all.labs[i])]])
+              
+            }else{  #custom option
+              pmi_min_value <- isolate(input[[paste0('pmi_min_', all.labs[i])]])
               pmi_max_value <-
-                (input[[paste0('pmi_max_', all.labs[i])]])
+                isolate(input[[paste0('pmi_max_', all.labs[i])]])
               yield_min_max_value <-
-                input[[paste0('conv_', all.labs[i])]]
+                isolate(input[[paste0('conv_', all.labs[i])]])
             }
           } else{
-            pmi_min_value <- (input[[paste0('pmi_min_', all.labs[i])]])
+            pmi_min_value <- isolate(input[[paste0('pmi_min_', all.labs[i])]])
             pmi_max_value <-
-              (input[[paste0('pmi_max_', all.labs[i])]])
+              isolate(input[[paste0('pmi_max_', all.labs[i])]])
             yield_min_max_value <-
               c(features$conv.range[pmi.ix, 'low'],
                 features$conv.range[pmi.ix, 'high'])
@@ -658,6 +667,16 @@ server <- shinyServer(function(input, output, session) {
                 label = paste0("MW of ",
                                all.labs[i], " : "),
                 value = isolate(input[[paste0('mw_', all.labs[i])]])
+              )
+            ),
+            column(
+              3,
+              selectizeInput(
+                paste0('Preset_', all.labs[i]),
+                label = 'Load from Preset:',
+                selected = (input[[paste0('Preset_', all.labs[i])]]),
+                choices = c("<custom>", presets.df$Type),
+                options = list(create = FALSE)
               )
             ),
             column(
@@ -691,16 +710,6 @@ server <- shinyServer(function(input, output, session) {
                 max = 1,
                 step = 0.01,
                 value = yield_min_max_value
-              )
-            ),
-            column(
-              3,
-              selectizeInput(
-                paste0('Preset_', all.labs[i]),
-                label = 'Load from Preset:',
-                selected = input[[paste0('Preset_', all.labs[i])]],
-                choices = c("<custom>", presets.df$Type),
-                options = list(create = FALSE)
               )
             )
           )

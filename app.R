@@ -96,7 +96,8 @@ pmi.calc <- function(conv.df,
                   conv.df$inlabels == in.lab) # i should be unique! - the index in the input dataframe
         c <-
           which(conv.df$inlabels[i] == all.labs) # the index in the A matrix
-        stoich.mc <- runif(N.iter,min=conv.df$stoich.high[i], max=conv.df$stoich.low[i])  # uniform sampling for stoich
+        stoich.mc <- runif(N.iter,max=max(conv.df$stoich.high[i],conv.df$stoich.low[i]),
+                           min=min(conv.df$stoich.high[i],conv.df$stoich.low[i]))# uniform sampling for stoich
         #print(summary(stoich.mc))
         rm.mc <-
           conv.df$mw.in[i] / (conv.df$mw.out[i] * yield.mc[r, ]) * stoich.mc

@@ -2,12 +2,20 @@
 # December 2016
 # Jacob Albrecht, Bristol-Myers Squibb
 
+# TODO: add two levels of presets, done 30Jan2018
+#TODO: add ability to load in previous sesison done 15Feb2018
+
 library(shiny)
 library(DiagrammeR) #for graphVis, version 0.9.0
 library(reshape2)
 library(ggplot2)
 library(mgcv) # for rmvn
 library(readxl)
+
+# set seed for reproducible results
+set.seed(8675309)
+
+presets_file <- 'Presets.xlsx'
 
 mv.samples <-
   function(xmean,
@@ -32,10 +40,10 @@ pmi.calc <- function(conv.df,
   n <- length(all.labs)
   A <- matrix(rep(0, n ^ 2), nrow = n)
   diag(A) <- rep(1, n)
-  A.low <- A
-  A.high <- A
-  nr <- nrow(A.low)
-  nc <- ncol(A.low)  # nr==nc , because the matrix should be square
+  #A.low <- A
+  #A.high <- A
+  nr <- nrow(A)
+  nc <- ncol(A)  # nr==nc , because the matrix should be square
   A.mc <-
     array(rep(A, N.iter), dim = c(nr, nc, N.iter))  # giant matrix of all conditions to be solved
   # identify product from gap in labels
@@ -96,21 +104,15 @@ pmi.calc <- function(conv.df,
                   conv.df$inlabels == in.lab) # i should be unique! - the index in the input dataframe
         c <-
           which(conv.df$inlabels[i] == all.labs) # the index in the A matrix
-        
-        mean.stoich = mean(c(conv.df$stoich.high[i], conv.df$stoich.low[i]))
-        sd.stoich = (conv.df$stoich.high[i] - conv.df$stoich.low[i]) / z
-        #print(sd.stoich)
-        stoich.mc <-
-          abs(rnorm(N.iter, mean = mean.stoich, sd = sd.stoich))  # hack to enforce positive stoich
+        stoich.mc <- runif(N.iter,max=max(conv.df$stoich.high[i],conv.df$stoich.low[i]),
+                           min=min(conv.df$stoich.high[i],conv.df$stoich.low[i]))# uniform sampling for stoich
         #print(summary(stoich.mc))
-        
         rm.mc <-
           conv.df$mw.in[i] / (conv.df$mw.out[i] * yield.mc[r, ]) * stoich.mc
         A.mc[c, r, ] <- -1 * rm.mc # put RM data into A matrix
         S.mc <-
           S.mc - rm.mc # as the RM values are calculated, subtrac tthesee from PMI to equal S wehn the loop is done
       }
-      
       A.mc[w, r, ] <- -S.mc # put S values into A matrxi
     }
   }
@@ -175,7 +177,7 @@ pmi.calc <- function(conv.df,
 ui <- shinyUI(navbarPage(
   "PMI Calculator",
   tabPanel("1. Define Process",
-           #sidebarPanel(isolate(grVizOutput('diagram'))),
+           
            mainPanel(
              fluidRow(column(
                12,
@@ -189,7 +191,16 @@ ui <- shinyUI(navbarPage(
                column(4, div()),
                column(4, actionButton("add", "Add Row")),
                column(4, actionButton("remove", "Remove Row"))
-             ) # END fluidRow
+
+             ), # END fluidRow
+             br(),
+             br(),
+
+             br(),
+             fluidRow(column(6,downloadButton('downloadSpec', 'Download Process Info as RDS file'))),
+             fluidRow(column(6,
+                      fileInput('uploadSpec', 'Upload Process Info RDS file',accept = c('.rds')))
+             ) # END fluidrow
            )),
   # end add features panel
   tabPanel(
@@ -209,8 +220,13 @@ ui <- shinyUI(navbarPage(
       numericInput('correlation', 'PMI/Yield Correlation', value =
                      -0.53),
       actionButton("goButton", "Calculate!"),
-      downloadButton('downloadData', 'Download')
+      br(),
+
+      br(),
+      downloadButton('downloadData', 'Download Monte Carlo Results')
+      
     ),
+    
     mainPanel(tabsetPanel(
       tabPanel(
         "Step Metrics",
@@ -228,7 +244,45 @@ ui <- shinyUI(navbarPage(
 
 server <- shinyServer(function(input, output, session) {
   # read in presets
-  presets.df <- data.frame(read_excel('Presets.xlsx'))
+  presets.df <- data.frame(read_excel(presets_file))
+  
+  # for brevity, define function to collect step values:
+  stepinfo <- function(i) {
+    svl <- paste0('stoich.low_', i)
+    svh <- paste0('stoich.high_', i)
+    vn <- paste0('InLabel', i)
+    vo <- paste0('OutLabel', i)
+    mwn <- paste0('mw_', input[[vn]])
+    mwo <- paste0('mw_', input[[vo]])
+    fv <- paste0('conv_', input[[vo]])
+    
+    # tab 1 info
+    si.1 <- data.frame(
+      inlabels = input[[vn]],
+      outlabels = input[[vo]],
+      stoich.low = input[[svl]],
+      stoich.high = input[[svh]]
+    )
+    # tab 2 info
+    if (all(is.finite(c(input[[mwn]],input[[mwo]],input[[fv]])))){
+    #print(is.finite(c(input[[mwn]],input[[mwo]],input[[fv]])))
+    si.2 <- data.frame( 
+      mw.in = input[[mwn]],
+      mw.out = input[[mwo]],
+      yield.low = input[[fv]][1],
+      yield.high = input[[fv]][2]
+    )
+    
+    if (nrow(si.1)==nrow(si.2)){
+      return(cbind(si.1,si.2))
+    }else{
+      return(si.1)
+    }
+    }else{
+      return(si.1)
+    }
+      
+  }
   
   # initial value for features:
   features <- reactiveValues(
@@ -249,32 +303,13 @@ server <- shinyServer(function(input, output, session) {
     )
   )
   
+  # initial value for reaction values:
+  rxn.info <- reactiveValues()
+  
   df <- eventReactive(input$goButton, {
     all.labs <- unique(c(features$inlabels, features$outlabels))
     # print(features$renderd)
-    conv.out <- lapply(features$renderd, function(i) {
-      svl <- paste0('stoich.low_', i)
-      svh <- paste0('stoich.high_', i)
-      vn <- paste0('InLabel', i)
-      vo <- paste0('OutLabel', i)
-      mwn <- paste0('mw_', input[[vn]])
-      mwo <- paste0('mw_', input[[vo]])
-      fv <- paste0('conv_', input[[vo]])
-      #print(all.labs)
-      
-      data.frame(
-        inlabels = input[[vn]],
-        outlabels = input[[vo]],
-        mw.in = input[[mwn]],
-        mw.out = input[[mwo]],
-        stoich.low = input[[svl]],
-        stoich.high = input[[svh]],
-        yield.low = input[[fv]][1],
-        yield.high = input[[fv]][2]
-      )
-      #in.per.out.low=input[[mwn]]/(input[[mwo]]*input[[fv]][2])*input[[sv]],
-      #in.per.out.high=input[[mwn]]/(input[[mwo]]*input[[fv]][1])*input[[sv]])
-    })
+    conv.out <- lapply(features$renderd, stepinfo)
     
     pmi.out <- lapply(seq(all.labs), function(i) {
       # get ids of PMI inputs
@@ -299,7 +334,9 @@ server <- shinyServer(function(input, output, session) {
         
       }
     })
-    # TODO: assert that nrow(pmi.out)==nrow(conv.out)
+    
+    stopifnot(nrow(pmi.out)==nrow(conv.out))
+    
     temp.df <- do.call(rbind, c(conv.out, pmi.out))
     temp.df$inlabels <- as.character(temp.df$inlabels)
     temp.df$outlabels <- as.character(temp.df$outlabels)
@@ -307,6 +344,8 @@ server <- shinyServer(function(input, output, session) {
     processinfo <-
       temp.df#cbind(temp.df,data.frame(out.per.in.high=1/temp.df$in.per.out.low))
     # do the MC calculation and return the resulting list of values into df():
+    print('Process Info')
+    print(processinfo) # spit out information for process
     pmi.calc(processinfo,
              N.iter = input$N.iter,
              correlation = input[['correlation']])
@@ -324,9 +363,6 @@ server <- shinyServer(function(input, output, session) {
   })
   
   output$tbl <- renderTable({
-    #conv.df<-df()
-    #print(conv.df)
-    # print('render table')
     df()[1]$ranges
   }, rownames = TRUE)
   
@@ -358,12 +394,43 @@ server <- shinyServer(function(input, output, session) {
     
   })
   
+  # buttons to download data
   output$downloadData <- downloadHandler(
     filename = 'MC_results.csv',
     content = function(con) {
       write.csv(df()[2]$mc, con)
     }
   )
+  
+  output$downloadSpec <- downloadHandler(
+    filename = 'PMI_specification.rds',
+    content = function(con) {
+      print('Saving Info')
+      #print(isolate(rxn.info[['mw_A']]))
+      saveRDS(list(features=isolate(reactiveValuesToList(features)),
+                   rxn.info = isolate(reactiveValuesToList(rxn.info))), file=con, ascii= TRUE)
+    }
+  )
+  
+  # to upload past specification:
+  observeEvent(input$uploadSpec,{
+      d <- readRDS(input$uploadSpec$datapath)
+      #print(names(d))
+      #print(names(d$features))
+      for (n in names(d$features)){
+        features[[n]] <- d$features[[n]]
+      }
+      
+      
+      for (n in names(d$rxn.info)){
+        rxn.info[[n]] <- d$rxn.info[[n]]
+      }
+      print('Upload complete')
+      #print(isolate(rxn.info[['mw_A']]))
+      
+      
+      #output$uiOutpt_2 <- d$uiOutpt_2
+  })
   
   output$OverallPMI <- renderPlot({
     mcsamps <- df()[2]$mc
@@ -414,23 +481,13 @@ server <- shinyServer(function(input, output, session) {
                                                                               0.1)
   })
   
+
+  
   # Increment reactive values array used to store how may rows we have rendered
   observeEvent(input$add, {
-    out <- lapply(features$renderd, function(i) {
-      #fv <- paste0('conv_',i)
-      vn <- paste0('InLabel', i)
-      vo <- paste0('OutLabel', i)
-      svl <- paste0('stoich.low_', i)
-      svh <- paste0('stoich.high_', i)
-      data.frame(
-        inlabels = input[[vn]],
-        outlabels = input[[vo]],
-        stoich.low = input[[svl]],
-        stoich.high = input[[svh]]
-      )
-    })
+    out <- lapply(features$renderd, stepinfo)
     
-    df <- do.call(rbind, out)
+    df <- do.call(dplyr::bind_rows, out)
     #print(df)
     features$inlabels <- c(as.character(df$inlabels), '')
     features$outlabels <- c(as.character(df$outlabels), '')
@@ -440,65 +497,35 @@ server <- shinyServer(function(input, output, session) {
       c(features$renderd, length(features$renderd) + 1)
     features$stoich.low <- c(df$stoich.low, 1)
     features$stoich.high <- c(df$stoich.high, 1)
-    #print(features$renderd)
-    #print(names(features))
-    #features$conv.low <- c(df$conv.low,0.5)
-    #features$conv.high <- c(df$conv.high,0.85)
     
   })
   
-  
-  
   observeEvent(input$remove, {
     features$renderd <- features$renderd[-length(features$renderd)]
-    out <- lapply(features$renderd, function(i) {
-      #fv <- paste0('conv_',i)
-      vn <- paste0('InLabel', i)
-      svl <- paste0('stoich.low_', i)
-      svh <- paste0('stoich.high_', i)
-      vo <- paste0('OutLabel', i)
-      data.frame(
-        inlabels = input[[vn]],
-        outlabels = input[[vo]],
-        stoich.low = input[[svl]],
-        stoich.high = input[[svh]]
-      )#, conv.low=input[[fv]][1],conv.high= input[[fv]][2] )
-    })
-    df <- do.call(rbind, out)
+    out <- lapply(features$renderd, stepinfo)
+    df <- do.call(dplyr::bind_rows, out)
     # print(df)
     if (nrow(df) > 0) {
       features$outlabels <- as.character(df$outlabels)
       features$inlabels <- as.character(df$inlabels)
       features$stoich.low <- df$stoich.low
       features$stoich.high <- df$stoich.high
-      #features$conv.low <- df$conv.low
-      # features$conv.high <- df$conv.high
-      # browser()
+
     }
   })
   
   observeEvent(input$inNavbar, {
-    out <- lapply(features$renderd, function(i) {
-      #fv <- paste0('conv_',i)
-      vn <- paste0('InLabel', i)
-      vo <- paste0('OutLabel', i)
-      svl <- paste0('stoich.low_', i)
-      svh <- paste0('stoich.high_', i)
-      data.frame(
-        inlabels = input[[vn]],
-        outlabels = input[[vo]],
-        stoich.low = input[[svl]],
-        stoich.high = input[[svh]]
-      )
-    })
-    df <- do.call(rbind, out)
+    out <- lapply(features$renderd, stepinfo)
+    #print(out)
+    
+    df <- do.call(dplyr::bind_rows, out)
+    #print(df)
     if (nrow(df) > 0) {
       features$outlabels <- as.character(df$outlabels)
       features$inlabels <- as.character(df$inlabels)
       features$stoich.low <- df$stoich.low
       features$stoich.high <- df$stoich.high
-      # features$conv.low <- df$conv.low
-      #features$conv.high <- df$conv.high
+
     }
   })
   
@@ -506,7 +533,7 @@ server <- shinyServer(function(input, output, session) {
   
   # this version of output$diagram for older DiagrammeR
   
-  if (packageVersion('DiagrammeR')!='0.9.0'){
+  if (packageVersion('DiagrammeR')<'0.9.0'){
   
   output$diagram<-renderGrViz({
     g1 <- create_graph(nodes_df = create_nodes(nodes=features$inlabels),
@@ -534,8 +561,32 @@ server <- shinyServer(function(input, output, session) {
   
   }
   
+  
+  observeEvent({lapply(grep('^(?!mw|inNavbar|uploadSpec)',names(input),value=TRUE,perl=TRUE),
+                       function(i){(input[[i]])}
+                       )}, {
+    #print('filling in rxn.info from input...')
+    #print(grep("^(?!mw|inNavbar|uploadSpec)",names(input),value=TRUE,perl=TRUE))
+    all.labs <- unique(c(isolate(features$inlabels), isolate(features$outlabels)))
+    #print(isolate(rxn.info[['mw_A']]))
+    # TODO: refactor this nested garbage:
+    for (i in seq(all.labs)){
+      #print(paste0('mw_', all.labs[i]))
+      for (key in c('mw_','pmi_min_','pmi_max_','conv_','Preset_')){
+        if (!is.null(input[[paste0(key,all.labs[i])]])){
+          rxn.info[[paste0(key, all.labs[i])]] <- input[[paste0(key, all.labs[i])]]
+        }
+      }
+    }
+    #print(isolate(rxn.info[['mw_A']]))
+    #print('...rxn.info from input has been filled')
+  }, priority = -1)
+  
   # If reactive vector updated we render the UI again
   observe({
+    # create UI panels, this piece is for Tab #1
+    print('renderUI')
+    #print(isolate(rxn.info[['mw_A']]))
     output$uiOutpt <- renderUI({
       # Create rows
       rows <- lapply(features$renderd, function(i) {
@@ -593,9 +644,8 @@ server <- shinyServer(function(input, output, session) {
       do.call(shiny::tagList, rows)
     })
     
-    
     # RENDER UI for tab 2:
-    output$uiOutpt_2 <- renderUI({
+    tab2<- renderUI({
       # Create rows
       
       all.labs <- unique(c(features$inlabels, features$outlabels))
@@ -618,6 +668,7 @@ server <- shinyServer(function(input, output, session) {
                   high = 0.8
                 ))
       }
+      
       rows <- lapply(seq(all.labs), function(i) {
         if (all.labs[i] %in% unique(features$outlabels)) {
           pmi.ix <- all.labs[i] == row.names(features$pmi.range)
@@ -625,29 +676,30 @@ server <- shinyServer(function(input, output, session) {
           # a nested if statement to check that the Preset input exists AND it is one of the types,
           # this could be streamlined...
           # TODO: fix the overwriting of custom fields when other presets are used for other steps
-          if (!is.null(isolate(input[[paste0('Preset_', all.labs[i])]]))) {
-            if (isolate(input[[paste0('Preset_', all.labs[i])]]) %in% presets.df$Type) {
+          # TODO: user experience of having all rows reset with a change to one row must be addressed, lots of isolate statements are used, do they work?
+          if (!is.null(isolate(rxn.info[[paste0('Preset_', all.labs[i])]]))) {  # the row has a preset
+            if (isolate(rxn.info[[paste0('Preset_', all.labs[i])]]) %in% presets.df$Type) {
               ix <-
-                match(isolate(input[[paste0('Preset_', all.labs[i])]]), presets.df$Type)
+                match(isolate(rxn.info[[paste0('Preset_', all.labs[i])]]), presets.df$Type)
               pmi_min_value <- presets.df$PMI_low[ix]
               pmi_max_value <- presets.df$PMI_high[ix]
               yield_min_max_value <-
                 c(presets.df$Yield_low[ix], presets.df$Yield_high[ix])
-            }else{
-              pmi_min_value <- (input[[paste0('pmi_min_', all.labs[i])]])
+              
+            }else{  #custom option
+              pmi_min_value <- isolate(rxn.info[[paste0('pmi_min_', all.labs[i])]])
               pmi_max_value <-
-                (input[[paste0('pmi_max_', all.labs[i])]])
+                isolate(rxn.info[[paste0('pmi_max_', all.labs[i])]])
               yield_min_max_value <-
-                input[[paste0('conv_', all.labs[i])]]
+                isolate(rxn.info[[paste0('conv_', all.labs[i])]])
             }
           } else{
-            pmi_min_value <- (input[[paste0('pmi_min_', all.labs[i])]])
+            pmi_min_value <- isolate(rxn.info[[paste0('pmi_min_', all.labs[i])]])
             pmi_max_value <-
-              (input[[paste0('pmi_max_', all.labs[i])]])
+              isolate(rxn.info[[paste0('pmi_max_', all.labs[i])]])
             yield_min_max_value <-
               c(features$conv.range[pmi.ix, 'low'],
                 features$conv.range[pmi.ix, 'high'])
-            
           }
           
           fluidRow(
@@ -657,8 +709,22 @@ server <- shinyServer(function(input, output, session) {
                 paste0('mw_', all.labs[i]),
                 label = paste0("MW of ",
                                all.labs[i], " : "),
-                value = isolate(input[[paste0('mw_', all.labs[i])]])
+                value = (rxn.info[[paste0('mw_', all.labs[i])]])
               )
+            ),
+            column(
+              3,
+              selectizeInput(
+                paste0('Preset_', all.labs[i]),
+                label = 'Load from Preset:',
+                selected = (rxn.info[[paste0('Preset_', all.labs[i])]]),
+                choices = c(list(`custom`='custom'),split(presets.df$Type,presets.df$Category)),
+                options = list(create = FALSE)
+              ),
+              tags$style(type='text/css', 
+                         ".selectize-dropdown-content {
+                         max-height: 400px; font-size: 12px}"
+             )
             ),
             column(
               2,
@@ -692,16 +758,6 @@ server <- shinyServer(function(input, output, session) {
                 step = 0.01,
                 value = yield_min_max_value
               )
-            ),
-            column(
-              3,
-              selectizeInput(
-                paste0('Preset_', all.labs[i]),
-                label = 'Load from Preset:',
-                selected = input[[paste0('Preset_', all.labs[i])]],
-                choices = c("<custom>", presets.df$Type),
-                options = list(create = FALSE)
-              )
             )
           )
         } else{
@@ -713,15 +769,16 @@ server <- shinyServer(function(input, output, session) {
                              all.labs[i], " : "),
               min = 0,
               max = 100,
-              value = isolate(input[[paste0('mw_', all.labs[i])]])
+              value = (rxn.info[[paste0('mw_', all.labs[i])]])
             )
           ),
           column(6, div()))
         }
       })
       do.call(shiny::tagList, rows)
-    })
+    })# render tab 2
+    output$uiOutpt_2 <- tab2
   })
 })
 
-shinyApp(ui = ui, server = server)  
+shinyApp(ui, server)  

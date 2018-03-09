@@ -1,10 +1,6 @@
 ## Interactive app to calculate cumulative PMI for a synthetic sequence
-# December 2016
+# December 2016 - March 2018
 # Jacob Albrecht, Bristol-Myers Squibb
-
-# TODO: add two levels of presets, done 30Jan2018
-#TODO: add ability to load in previous sesison, done 20 Feb 2018
-
 
 library(shiny)
 library(DiagrammeR) #for graphVis, version 0.9.0
@@ -415,6 +411,7 @@ server <- shinyServer(function(input, output, session) {
   
   # to upload past specification:
   observeEvent(input$uploadSpec,{
+    
       d <- readRDS(input$uploadSpec$datapath)
       #print(names(d))
       #print(names(d$features))
@@ -422,9 +419,17 @@ server <- shinyServer(function(input, output, session) {
         features[[n]] <- d$features[[n]]
       }
       
-      
+
       for (n in names(d$rxn.info)){
         rxn.info[[n]] <- d$rxn.info[[n]]
+      }
+      
+      # remove features not present in the uploaded file:
+      for (n in setdiff(names(features),names(d$features))){
+        features[[n]] <- NULL
+      }
+      for (n in setdiff(names(rxn.info),names(d$rxn.info))){
+        rxn.info[[n]] <- NULL
       }
       print('Upload complete')
       #print(isolate(rxn.info[['mw_A']]))

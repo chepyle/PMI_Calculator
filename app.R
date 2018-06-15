@@ -68,13 +68,9 @@ pmi.calc <- function(conv.df,
     rp = which(conv.df$outlabels == out.lab &
                  conv.df$inlabels == "Waste")[1]
     # for debuggin
-    #print(rp)
     mean.pmi = mean(c(conv.df$yield.high[rp], conv.df$yield.low[rp]))
     sd.pmi = diff(c(conv.df$yield.high[rp], conv.df$yield.low[rp])) / z
     
-    # for debuggin
-    #print(mean.pmi)
-    #print(mean.yield)
     
     # pull the MC samples: (new)
     yield.pmi.mc <-
@@ -85,7 +81,6 @@ pmi.calc <- function(conv.df,
                  correlation,
                  N.iter = N.iter)
     
-    #print(head(yield.pmi.mc))
     yield.mc[r, ] <-
       sapply(yield.pmi.mc[, 1], function(x) {
         min(c(x, 1))
@@ -110,7 +105,7 @@ pmi.calc <- function(conv.df,
         S.mc <-
           S.mc - rm.mc # as the RM values are calculated, subtrac tthesee from PMI to equal S wehn the loop is done
       }
-      A.mc[w, r, ] <- -S.mc # put S values into A matrxi
+      A.mc[w, r, ] <- -S.mc # put S values into A matrix
     }
   }
   
@@ -173,6 +168,9 @@ pmi.calc <- function(conv.df,
 
 ui <- shinyUI(navbarPage(
   "PMI Calculator",
+  tabPanel("Information",
+    fluidPage( withMathJax(includeMarkdown("README.md")))
+           ),
   tabPanel("1. Define Process",
            
            mainPanel(
@@ -180,7 +178,7 @@ ui <- shinyUI(navbarPage(
                12,
                h3('Process'),
                p(
-                 'Define each step in the process here, specifying the input, yield, and output of each step '
+                 'Define each step in the process here, specifying the input and output of each step as well as the stoichiometry of each input'
                ),
                uiOutput('uiOutpt')
              )), # END fluidRow
@@ -212,10 +210,13 @@ ui <- shinyUI(navbarPage(
     "3. Results",
     sidebarPanel(
       p(" Press Calculate Button to Update Totals "),
-      numericInput('N.iter', 'Number of Iterations', value =
-                     5000),
-      numericInput('correlation', 'PMI/Yield Correlation', value =
-                     -0.53),
+      checkboxInput("advanced","Show Advanced Options"),
+      conditionalPanel(condition="input.advanced==true",
+        numericInput('N.iter', 'Number of Iterations', value =
+                       5000),
+        numericInput('correlation', 'PMI/Yield Correlation', value =
+                       -0.53)
+        ),
       actionButton("goButton", "Calculate!"),
       br(),
 
@@ -225,13 +226,13 @@ ui <- shinyUI(navbarPage(
     ),
     
     mainPanel(tabsetPanel(
+      tabPanel("Overall PMI", plotOutput('OverallPMI')),
       tabPanel(
         "Step Metrics",
         textOutput("text2"),
-        plotOutput('ggdensity'),
-        tableOutput('tbl')
+        plotOutput('ggdensity')
+        #tableOutput('tbl')
       ),
-      tabPanel("Overall PMI", plotOutput('OverallPMI')),
       tabPanel("Step Yield vs Step PMI", plotOutput('yield.v.pmi'))
     ))
   ),
@@ -381,12 +382,12 @@ server <- shinyServer(function(input, output, session) {
     
     m[prod] <- NULL # remove column for product
     
-    mm <- melt(m)
+    mm <- melt(m,variable.name="Component Mass")
     #  print(head(mm))
     
     p <-
-      ggplot(mm, aes(x = value, fill = variable)) + geom_histogram() + facet_wrap( ~
-                                                                                     variable, scales = 'free')
+      ggplot(mm, aes(x = value, fill = `Component Mass`)) + geom_histogram() + facet_wrap( ~
+                                                                                     `Component Mass`, scales = 'free')
     p
     
   })
@@ -477,14 +478,14 @@ server <- shinyServer(function(input, output, session) {
     y <- melt((df()[3]$yield.mc), value.name = 'StepYield')
     
     p <- melt((df()[4]$step.pmi), value.name = 'StepPMI')
-    
+    #print(head((df()[3]$yield.mc)))
+    #print(head(p))
     dat <- merge(y, p)
-    
-    
+    dat <- dat[complete.cases(dat),]
     #mdat<-melt(dat)
-    #  print(head(dat))
     ggplot(dat, aes(x = StepYield, y = StepPMI, color = Var1)) + geom_point(alpha =
-                                                                              0.1)
+                                                                              0.8) +
+      facet_wrap(~Var1)+ labs(color='Reaction Product')
   })
   
 

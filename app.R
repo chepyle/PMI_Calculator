@@ -8,6 +8,7 @@ library(reshape2)
 library(ggplot2)
 library(mgcv) # for rmvn
 library(readxl)
+library(markdown)
 
 # set seed for reproducible results
 set.seed(8675309)

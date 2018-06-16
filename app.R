@@ -229,6 +229,10 @@ ui <- shinyUI(navbarPage(
       tabPanel("Overall PMI", plotOutput('OverallPMI')),
       tabPanel(
         "Step Metrics",
+        p("The plots below show the distribution of the intermediate compounds needed to produce
+          one unit mass of final product.  The panel labeled waste is the sum of all processing 
+          masses that are not chemical intermediates"),
+        br(),
         textOutput("text2"),
         plotOutput('ggdensity')
         #tableOutput('tbl')
@@ -353,7 +357,7 @@ server <- shinyServer(function(input, output, session) {
     all.labs <- unique(c(features$inlabels, features$outlabels))
     prod <- all.labs[which(!all.labs %in% features$inlabels)]
     paste(sprintf(
-      "You have selected features: %s \n product: %s",
+      "You have selected intermediates: %s \n product: %s",
       c(paste(all.labs, collapse = ", ")),
       prod
     ))

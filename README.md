@@ -1,8 +1,8 @@
+<img src="ACSGCIPR.png" width=30% height=30%>
+
 # PMI Calculator
 
-This project calculates Process Mass Intensity (PMI) for a chemical synthesis route using the sequence of synthetic steps and step information.  The interactive [Shiny](http://shiny.rstudio.com/) app allows for interative process specification and PMI calculation.  The app is hosted [here](http://acsgcipr-predictpmi.shinyapps.io/pmi_calculator/).
-
-*ACS Green Chemistry Institute Pharmaceutical Roundtable, June 2018*
+Thanks to the efforts of the American Chemical Society Green Chemistry Institute Pharmaceutical Roundtable, this app calculates Process Mass Intensity (PMI) for a chemical synthesis route using the sequence of synthetic steps and step information.  The interactive [Shiny](http://shiny.rstudio.com/) app allows for interative process specification and PMI calculation from the modern web browser of your choice.  The app is hosted [here](http://acsgcipr-predictpmi.shinyapps.io/pmi_calculator/).
 
 ## What is Process Mass Intensity?
 
@@ -12,11 +12,11 @@ Process Mass Intensity (PMI) is a measure of a manufactruing process efficiency.
 
 Here \\(MassOfMaterials\\) includes the mass of process solvents, chemical reagents, and any other single-use consumables utilized in the process execution.  
 
-While PMI cannot distinguish the impact of the individual reagents and consumables used, it provides a simple and accessible means of discriminating among a set of potential processes. For a sequence of synthetic steps to make a final product, individual step PMI values may be used to determine the cumulative PMI for the entire route to the product.  When a chemist considers different retrosynthetic routes, they must depend on their experience to know which routes are most promising and should be tested in the laboratory.  To avoid personal biases, an analysis of 1800 reactions organized by reaction type and subtype was performed to characterize the range of PMIs reported for specific chemical reaction types.  By defining a sequence of reactions and their corresponding reaction type it is possible to estimate a plausible PMI for any proposed or unoptimized chemical synthesis step as well as the cumulative PMI for the multi-step route using historical information.  This ability to virtually screen different prospective routes for efficiency allows process chemists to focus their resources on a few promising synthetic approaches.
+While PMI cannot distinguish the impact of the individual reagents and consumables used, it provides a simple and accessible means of discriminating among a set of potential processes. For a sequence of synthetic steps to make a final product, individual step PMI values may be used to determine the cumulative PMI for the entire route to the product.  When a chemist considers different retrosynthetic routes, they must depend on their experience to know which routes are most promising and should be tested in the laboratory. To augment the chemist's personal experience with the performance of past processes, a dataset containing nearly two thousand multi-kilo scale-up reactions was created. The majority of entries (1200) were provided by eleven major pharmaceutical and biotech companies (AstraZeneca, Boehringer Ingelheim, Bristol-Myers Squibb, Eli Lilly, Merck, Novartis, Pfizer, Roche, Amgen, Genentech) and a CDMO (Asymchem) via the ACS GCI pharma roundtable. Additionally, seven hundred eighty entries were extracted from journal [OPRD](https://pubs.acs.org/journal/oprdfk) published across past three decades and representing nearly seventy pharma and biotech companies.  By defining a sequence of reactions and their corresponding reaction type, it is possible to estimate a plausible PMI for any proposed or unoptimized chemical synthesis step as well as the cumulative PMI for the multi-step route using historical information.  This ability to virtually screen different prospective routes for efficiency allows process chemists to focus their resources on a few promising synthetic approaches.
 
 ## How to use this app: 
 
-For a real or hypothetical process, the app requests data on two tabs, and then presents plots of the results on the last tab.  Because information is passsed between tabs only when they are clicked, it is best to click through the tabs in order, starting with the "Define Process" tab.
+For a real or hypothetical process, the app requests data on two tabs, and then presents plots of the results on the last tab.  Because information is passsed between tabs only when they are selected, it is best to click through the tabs in order, starting with the "Define Process" tab.
 
 ### Define your process
 
@@ -24,17 +24,19 @@ On the "Define Process" tab, enter each molecular transformation, specifying the
 
 ### Add some information on the steps and intermediates
 
-On the second "PMI Values" tab, enter the molecular weight and reaction details for each of the synthetic steps.  A preset dropdown is available to use historical ranges for specific classes of reactions.  For entering custom ranges product yield and step PMI values may be entered. Step PMI is defined as the mass of all inputs to the process (solvents, process aids, and other consumables) per mass of step product.  A graph of the process sequence will be generated to confirm the information entered on the "Define Process" tab.
+On the second "PMI Values" tab, enter the molecular weight and reaction details for each of the synthetic steps.  A preset dropdown is available to use historical ranges (the 25%-75% inter-quartile range) of PMI and yield for specific classes of reactions.  For entering custom ranges product yield and step PMI values may be entered. Step PMI is defined as the mass of all inputs to the process (solvents, process aids, and other consumables) per mass of step product.  A graph of the process sequence will be generated to confirm the information entered on the "Define Process" tab.
 
 ### Calculate and view the results
 
-On the third "Results" tab, there are buttons for starting the Monte Carlo calculation of PMI, as well as the option to download the simulation results.  The checkbox for advanced options allows access for adjusting two simulation options:
+On the third "Results" tab, there are buttons for starting the Monte Carlo calculation of PMI, as well as the option to download the simulation results.  The checkbox for advanced options allows access for adjusting the simulation options:
  
- - **Number of Monte Carlo simulations** 5000 iterations is the default to balance between calculation time and result quality.
+ - **Number of Monte Carlo simulations**: 5000 iterations is the default to balance between calculation time and result quality.
 
- - **Correlation between PMI and Yield** PMI and Yield have a moderate negative correlation (-0.53) from our analysis.  This correlation is used to simulate a more realistic range of process performance.
+ - **Min and Max definitions**:  For the values of step PMI and Yield, the "Min" and "Max" are defined by default to the 99% intervals of a normal distribution.  To change the interval another value, such as 95% or 50%, you may do so here.  The Min and Max range inputs of Stoichiometry is always assumed to have a uniform distribution.
 
-Once the calculation has been run, the plotted results will automatically be displayed.  A button to download the raw Monte Carlo samples is available if a more customized analysis is needed.  To save the plot images you may right click on the image to save to your computer.  There are three tabs to show different views of the data:
+ - **Correlation between PMI and Yield**: PMI and Yield have a moderate negative correlation (-0.53) from our analysis.  This correlation is used to simulate a more realistic range of process performance.
+
+Once the calculation has been run, the plotted results will automatically be displayed.  A button to download the raw Monte Carlo samples is available if a more customized analysis is needed.  To save the plot images you may right click on the image to save to your computer/tablet/phone.  There are three tabs to show different views of the data:
 
  - **Overall PMI** A histogram of the cumulative PMI for the whole process, 95% intervals are displayed.  This plot is the main product of the app.
 
@@ -42,6 +44,17 @@ Once the calculation has been run, the plotted results will automatically be dis
 
  - **Step Yield vs Step PMI** Plots are generated to show the correlation between PMI and Yield for each of the reaction products.  Useful to explore the potential performance of individual reactions.
 
+## Reference
+
+ - Jun Li, Jacob Albrecht, Alina Borovika, and Martin D. Eastgate, "Evolving Green Chemistry Metrics into Predictive Tools for Decision Making and Benchmarking Analytics" *ACS Sustainable Chem. Eng.*, **2018** [10.1021/acssuschemeng.7b03407](https://dx.doi.org/10.1021/acssuschemeng.7b03407)
+
+ -  Jun Li, Eric M. Simmons, and  Martin D. Eastgate, "A data-driven strategy for predicting greenness scores, rationally comparing synthetic routes and benchmarking PMI outcomes for the synthesis of molecules in the pharmaceutical industry" *Green Chemistry*, **2017** [10.1039/c6gc02359b](https://dx.doi.org/10.1039/c6gc02359b)
+
+## Acknowledgements
+
+*developed as part of the ACS Green Chemistry Institute Pharmaceutical Roundtable, June 2018*
+
 *app created by Jacob Albrecht, Bristol-Myers Squibb jacob.albrecht@bms.com*
 
 *app concept and design contributions from Jun Li, Alina Borovika, Martin Eastgate, Bristol-Myers Squibb*
+

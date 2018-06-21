@@ -1,5 +1,5 @@
 ## Interactive app to calculate cumulative PMI for a synthetic sequence
-# December 2016 - March 2018
+# December 2016 - June 2018
 # Jacob Albrecht, Bristol-Myers Squibb
 
 library(shiny)
@@ -22,7 +22,7 @@ mv.samples <-
            ysd,
            correlation = -0.53,
            N.iter = 5000) {
-    # simple function to calculate bivariate normal distributions givend means, sds and correlation
+    # simple function to calculate bivariate normal distributions given means, sds and correlation
     rmvn(N.iter, c(xmean, ymean), matrix(
       c(xsd ^ 2, correlation * xsd * ysd, correlation * xsd * ysd, ysd ^ 2),
       nrow = 2
@@ -33,6 +33,7 @@ pmi.calc <- function(conv.df,
                      N.iter = 5000,
                      z = 5.15,
                      correlation = -0.53) {
+  
   # create system of equations,
   all.labs <- unique(c(conv.df$inlabels, conv.df$outlabels))
   n <- length(all.labs)
@@ -47,7 +48,7 @@ pmi.calc <- function(conv.df,
   # identify product from gap in labels
   prod <- all.labs[which(!all.labs %in% conv.df$inlabels)]
   
-  # print(conv.df) # for debuggin
+
   
   w <- which('Waste' == all.labs)  # for indexing in the A.mc matrix
   
@@ -55,16 +56,14 @@ pmi.calc <- function(conv.df,
   step.pmi <- matrix(nrow = length(all.labs), ncol = N.iter)
   
   for (out.lab in unique(conv.df$outlabel)) {
-    # print(out.lab)# for debuggin
-    
+
     r <- which(out.lab == all.labs) # row for A matrix
     
     # collect yield and pmi metrics for bivariate sampling
     ry = which(conv.df$outlabels == out.lab &
                  conv.df$inlabels != "Waste")[1]
     mean.yield = mean(c(conv.df$yield.high[ry], conv.df$yield.low[ry]))
-    sd.yield = diff(c(conv.df$yield.high[ry], conv.df$yield.low[ry])) /
-      z
+    sd.yield = diff(c(conv.df$yield.high[ry], conv.df$yield.low[ry])) /z
     
     rp = which(conv.df$outlabels == out.lab &
                  conv.df$inlabels == "Waste")[1]
@@ -73,7 +72,7 @@ pmi.calc <- function(conv.df,
     sd.pmi = diff(c(conv.df$yield.high[rp], conv.df$yield.low[rp])) / z
     
     
-    # pull the MC samples: (new)
+    # pull the MC samples: 
     yield.pmi.mc <-
       mv.samples(mean.yield,
                  sd.yield,
@@ -82,12 +81,24 @@ pmi.calc <- function(conv.df,
                  correlation,
                  N.iter = N.iter)
     
-    yield.mc[r, ] <-
-      sapply(yield.pmi.mc[, 1], function(x) {
-        min(c(x, 1))
-      }) # cap yield at 100%
-    step.pmi[r, ] <- yield.pmi.mc[, 2]
-    S.mc <- yield.pmi.mc[, 2]
+    mc.violate.constraints <- which(apply(yield.pmi.mc,1,FUN=function(x){
+      if ((x[1]>0 ) & (x[1]<=1) & (x[2]>=1)){
+        return(FALSE)
+      }else{
+        return(TRUE)
+      }
+    }))
+    
+    # replace samples that violate constraint with samples of passing conditions:
+    if (length(mc.violate.constraints)>0){
+      resample.rows <- sample(setdiff(seq(N.iter),mc.violate.constraints),length(mc.violate.constraints),replace = TRUE)
+      yield.pmi.mc[mc.violate.constraints,] <- yield.pmi.mc[resample.rows,]
+    }
+    
+    yield.mc[r,] <- yield.pmi.mc[,1]
+    S.mc <- yield.pmi.mc[,2]
+    
+    step.pmi[r,] <- S.mc
     
     for (in.lab in conv.df$inlabel[conv.df$outlabel == out.lab]) {
       #loop through all input materials to calculate RM and S:
@@ -95,17 +106,15 @@ pmi.calc <- function(conv.df,
         i <-
           which(conv.df$outlabels == out.lab &
                   conv.df$inlabels == in.lab) # i should be unique! - the index in the input dataframe
-        c <-
-          which(conv.df$inlabels[i] == all.labs) # the index in the A matrix
+        c <-which(conv.df$inlabels[i] == all.labs) # the index in the A matrix
         stoich.mc <- runif(N.iter,max=max(conv.df$stoich.high[i],conv.df$stoich.low[i]),
                            min=min(conv.df$stoich.high[i],conv.df$stoich.low[i]))# uniform sampling for stoich
-        #print(summary(stoich.mc))
         rm.mc <-
           conv.df$mw.in[i] / (conv.df$mw.out[i] * yield.mc[r, ]) * stoich.mc
         A.mc[c, r, ] <- -1 * rm.mc # put RM data into A matrix
-        S.mc <-
-          S.mc - rm.mc # as the RM values are calculated, subtrac tthesee from PMI to equal S wehn the loop is done
+        S.mc <- S.mc - rm.mc # as the RM values are calculated, subtract thesee from PMI to equal S when the loop is done
       }
+      
       A.mc[w, r, ] <- -S.mc # put S values into A matrix
     }
   }
@@ -113,7 +122,7 @@ pmi.calc <- function(conv.df,
   b <- matrix(rep(0, n), nrow = n)
   b[prod == all.labs] <- 1 # product is set to 1 kg basis
   
-  # TODO: error/negative value checking on graph, no loops, no duplicate conversions, one and only one product, nodes labeled "waste" etc.
+  # TODO: error/loop checking on graph, no duplicate conversions, one and only one product, nodes labeled "waste" etc.
   
   # solve linear algebra
   soln.mc <- apply(
@@ -123,31 +132,20 @@ pmi.calc <- function(conv.df,
       solve(X, b)
     }
   )
-  
-  # print some info for debugging:
-  #print(dim(A.mc))
-  #print(all.labs)
-  #print(A.mc[,,1])
-  #print(conv.df)
-  #print(summary(t(yield.mc)))
-  #print(summary(t(step.pmi)))
-  
+
   row.names(soln.mc) <- all.labs
-  #print(dim(yield.mc))
-  #print((all.labs))
+
   row.names(yield.mc) <- all.labs
   row.names(step.pmi) <- all.labs
+  #print('solved pmi')
   #print(summary(t(soln.mc)))
   
   soln.low <- apply(soln.mc, 1, function(x) {
-    quantile(x, probs = 0.05)
+    quantile(x, probs = 0.05,na.rm = TRUE)
   })
   soln.high <- apply(soln.mc, 1, function(x) {
-    quantile(x, probs = 0.95)
+    quantile(x, probs = 0.95,na.rm =TRUE)
   })
-  
-  #row.names(soln)<-all.names
-  #print(data.frame(soln.low,soln.high,row.names=all.labs))
   
   # dump data here for debuggin:
   #save.image(file="debug.RData")
@@ -215,6 +213,11 @@ ui <- shinyUI(navbarPage(
       conditionalPanel(condition="input.advanced==true",
         numericInput('N.iter', 'Number of Iterations', value =
                        5000),
+        selectInput('sigma_scale','Min and Max definitions',
+                    list(`Normal 99% Interval`=5.15,
+                         `Normal 95% Interval`=3.92,
+                         `Normal 50% Interval`=1.35),
+                    selected = 5.15),
         numericInput('correlation', 'PMI/Yield Correlation', value =
                        -0.53)
         ),
@@ -264,27 +267,25 @@ server <- shinyServer(function(input, output, session) {
       inlabels = input[[vn]],
       outlabels = input[[vo]],
       stoich.low = input[[svl]],
-      stoich.high = input[[svh]]
+      stoich.high = input[[svh]],stringsAsFactors = FALSE
     )
     # tab 2 info
     if (all(is.finite(c(input[[mwn]],input[[mwo]],input[[fv]])))){
-    #print(is.finite(c(input[[mwn]],input[[mwo]],input[[fv]])))
-    si.2 <- data.frame( 
-      mw.in = input[[mwn]],
-      mw.out = input[[mwo]],
-      yield.low = input[[fv]][1],
-      yield.high = input[[fv]][2]
-    )
-    
-    if (nrow(si.1)==nrow(si.2)){
-      return(cbind(si.1,si.2))
-    }else{
-      return(si.1)
-    }
-    }else{
-      return(si.1)
-    }
+      si.2 <- data.frame( 
+        mw.in = input[[mwn]],
+        mw.out = input[[mwo]],
+        yield.low = input[[fv]][1],
+        yield.high = input[[fv]][2]
+      )
       
+      if (nrow(si.1)==nrow(si.2)){
+        return(cbind(si.1,si.2))
+      }else{
+        return(si.1)
+    }
+    }else{
+      return(si.1)
+    }
   }
   
   # initial value for features:
@@ -311,7 +312,6 @@ server <- shinyServer(function(input, output, session) {
   
   df <- eventReactive(input$goButton, {
     all.labs <- unique(c(features$inlabels, features$outlabels))
-    # print(features$renderd)
     conv.out <- lapply(features$renderd, stepinfo)
     
     pmi.out <- lapply(seq(all.labs), function(i) {
@@ -351,6 +351,7 @@ server <- shinyServer(function(input, output, session) {
     print(processinfo) # spit out information for process
     pmi.calc(processinfo,
              N.iter = input$N.iter,
+             z = as.numeric(input[['sigma_scale']]),
              correlation = input[['correlation']])
   })
   
@@ -372,26 +373,21 @@ server <- shinyServer(function(input, output, session) {
   
   output$ggdensity <- renderPlot({
     mcsamps <- df()[2]$mc
-    #  print(summary(t(mcsamps)))
     m <- data.frame(t(mcsamps))
     conv.df <- df()[5]$conv.df
     
     all.labs <- unique(c(conv.df$inlabels, conv.df$outlabels))
     prod <- all.labs[which(!all.labs %in% conv.df$inlabels)]
-    
-    # print(head(m))
+  
     m$pmi <-
       apply(m, 1, sum) - apply(m[names(m) %in% unique(conv.df$outlabels)], 1, sum)
-    
-    # print('render plot')
     
     m[prod] <- NULL # remove column for product
     
     mm <- melt(m,variable.name="Component Mass")
-    #  print(head(mm))
-    
+
     p <-
-      ggplot(mm, aes(x = value, fill = `Component Mass`)) + geom_histogram() + facet_wrap( ~
+      ggplot(mm, aes(x = value, fill = `Component Mass`)) + geom_histogram(bins = 30) + facet_wrap( ~
                                                                                      `Component Mass`, scales = 'free')
     p
     
@@ -409,7 +405,6 @@ server <- shinyServer(function(input, output, session) {
     filename = 'PMI_specification.rds',
     content = function(con) {
       print('Saving Info')
-      #print(isolate(rxn.info[['mw_A']]))
       saveRDS(list(features=isolate(reactiveValuesToList(features)),
                    rxn.info = isolate(reactiveValuesToList(rxn.info))), file=con, ascii= TRUE)
     }
@@ -419,8 +414,6 @@ server <- shinyServer(function(input, output, session) {
   observeEvent(input$uploadSpec,{
     
       d <- readRDS(input$uploadSpec$datapath)
-      #print(names(d))
-      #print(names(d$features))
       for (n in names(d$features)){
         features[[n]] <- d$features[[n]]
       }
@@ -438,8 +431,6 @@ server <- shinyServer(function(input, output, session) {
         rxn.info[[n]] <- NULL
       }
       print('Upload complete')
-      #print(isolate(rxn.info[['mw_A']]))
-      
       
       #output$uiOutpt_2 <- d$uiOutpt_2
   })
@@ -447,17 +438,17 @@ server <- shinyServer(function(input, output, session) {
   output$OverallPMI <- renderPlot({
     mcsamps <- df()[2]$mc
     conv.df <- df()[5]$conv.df
-    # print(summary(t(mcsamps)))
+
     m <- data.frame(t(mcsamps))
     m$pmi <-
       apply(m, 1, sum) - apply(m[names(m) %in% unique(conv.df$outlabels)], 1, sum)
     Cumulative_PMI <- m$pmi
     Cpmi_mean <- round(mean(Cumulative_PMI), 1)
     Cpmi_conf_left  <-
-      round(quantile(Cumulative_PMI, c(0.025, 0.975))[1], 1)
+      round(quantile(Cumulative_PMI, c(0.025, 0.975),na.rm=TRUE)[1], 1)
     Cpmi_conf_right  <-
-      round(quantile(Cumulative_PMI, c(0.025, 0.975))[2], 1)
-    
+      round(quantile(Cumulative_PMI, c(0.025, 0.975),na.rm=TRUE)[2], 1)
+
     hist(
       Cumulative_PMI,
       breaks = 40,
@@ -483,11 +474,10 @@ server <- shinyServer(function(input, output, session) {
     y <- melt((df()[3]$yield.mc), value.name = 'StepYield')
     
     p <- melt((df()[4]$step.pmi), value.name = 'StepPMI')
-    #print(head((df()[3]$yield.mc)))
-    #print(head(p))
+
     dat <- merge(y, p)
     dat <- dat[complete.cases(dat),]
-    #mdat<-melt(dat)
+
     ggplot(dat, aes(x = StepYield, y = StepPMI, color = Var1)) + geom_point(alpha =
                                                                               0.8) +
       facet_wrap(~Var1)+ labs(color='Reaction Product')
@@ -500,11 +490,10 @@ server <- shinyServer(function(input, output, session) {
     out <- lapply(features$renderd, stepinfo)
     
     df <- do.call(dplyr::bind_rows, out)
-    #print(df)
+  
     features$inlabels <- c(as.character(df$inlabels), '')
     features$outlabels <- c(as.character(df$outlabels), '')
-    #print(c(features$inlabels,features$outlabels))
-    
+ 
     features$renderd <-
       c(features$renderd, length(features$renderd) + 1)
     features$stoich.low <- c(df$stoich.low, 1)
@@ -516,7 +505,7 @@ server <- shinyServer(function(input, output, session) {
     features$renderd <- features$renderd[-length(features$renderd)]
     out <- lapply(features$renderd, stepinfo)
     df <- do.call(dplyr::bind_rows, out)
-    # print(df)
+  
     if (nrow(df) > 0) {
       features$outlabels <- as.character(df$outlabels)
       features$inlabels <- as.character(df$inlabels)
@@ -528,10 +517,9 @@ server <- shinyServer(function(input, output, session) {
   
   observeEvent(input$inNavbar, {
     out <- lapply(features$renderd, stepinfo)
-    #print(out)
-    
+
     df <- do.call(dplyr::bind_rows, out)
-    #print(df)
+ 
     if (nrow(df) > 0) {
       features$outlabels <- as.character(df$outlabels)
       features$inlabels <- as.character(df$inlabels)
@@ -577,10 +565,9 @@ server <- shinyServer(function(input, output, session) {
   observeEvent({lapply(grep('^(?!mw|inNavbar|uploadSpec)',names(input),value=TRUE,perl=TRUE),
                        function(i){(input[[i]])}
                        )}, {
-    #print('filling in rxn.info from input...')
-    #print(grep("^(?!mw|inNavbar|uploadSpec)",names(input),value=TRUE,perl=TRUE))
+  
     all.labs <- unique(c(isolate(features$inlabels), isolate(features$outlabels)))
-    #print(isolate(rxn.info[['mw_A']]))
+    
     # TODO: refactor this nested garbage:
     for (i in seq(all.labs)){
       #print(paste0('mw_', all.labs[i]))
@@ -590,15 +577,14 @@ server <- shinyServer(function(input, output, session) {
         }
       }
     }
-    #print(isolate(rxn.info[['mw_A']]))
-    #print('...rxn.info from input has been filled')
+
   }, priority = -1)
   
   # If reactive vector updated we render the UI again
   observe({
     # create UI panels, this piece is for Tab #1
-    print('renderUI')
-    #print(isolate(rxn.info[['mw_A']]))
+    #
+    
     output$uiOutpt <- renderUI({
       # Create rows
       rows <- lapply(features$renderd, function(i) {
@@ -780,7 +766,7 @@ server <- shinyServer(function(input, output, session) {
               label = paste0("MW of ",
                              all.labs[i], " : "),
               min = 0,
-              max = 100,
+              max = 1000,
               value = (rxn.info[[paste0('mw_', all.labs[i])]])
             )
           ),

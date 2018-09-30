@@ -10,8 +10,6 @@ library(mgcv) # for rmvn
 library(readxl)
 library(markdown)
 
-# set seed for reproducible results
-set.seed(8675309)
 
 presets_file <- 'Presets.xlsx'
 
@@ -33,6 +31,9 @@ pmi.calc <- function(conv.df,
                      N.iter = 5000,
                      z = 5.15,
                      correlation = -0.53) {
+  
+  # set seed for reproducible results
+  set.seed(8675309)
   
   # create system of equations,
   all.labs <- unique(c(conv.df$inlabels, conv.df$outlabels))
@@ -568,7 +569,7 @@ server <- shinyServer(function(input, output, session) {
   
     all.labs <- unique(c(isolate(features$inlabels), isolate(features$outlabels)))
     
-    # TODO: refactor this nested garbage:
+    # TODO: refactor this nested loop:
     for (i in seq(all.labs)){
       #print(paste0('mw_', all.labs[i]))
       for (key in c('mw_','pmi_min_','pmi_max_','conv_','Preset_')){
@@ -589,7 +590,7 @@ server <- shinyServer(function(input, output, session) {
       # Create rows
       rows <- lapply(features$renderd, function(i) {
         fluidRow(
-          # duplicate choices make selectize poop the bed, use unique():
+          # duplicate choices make selectize unhappy, use unique():
           
           column(
             2,

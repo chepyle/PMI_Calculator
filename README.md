@@ -1,6 +1,6 @@
 <img src="ACSGCIPR.png" width=30% height=30%>
 
-# PMI Calculator
+# PMI Predictor
 
 Thanks to the efforts of the American Chemical Society Green Chemistry Institute Pharmaceutical Roundtable, this app calculates Process Mass Intensity (PMI) for a chemical synthesis route using the sequence of synthetic steps and step information.  The interactive [Shiny](http://shiny.rstudio.com/) app allows for interative process specification and PMI calculation from the modern web browser of your choice.
 

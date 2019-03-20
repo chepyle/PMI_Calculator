@@ -178,7 +178,7 @@ ui <- shinyUI(navbarPage(
                12,
                h3('Process'),
                p(
-                 'Define each step in the process here, specifying the input and output of each step as well as the stoichiometry of each input'
+                 'Define each step in the process here, specifying the input and output of each step as well as the stoichiometry of each input. Starting with the longest linear sequence is recommended to organize the input fields for the steps.'
                ),
                uiOutput('uiOutpt')
              )), # END fluidRow
@@ -202,6 +202,7 @@ ui <- shinyUI(navbarPage(
     "2. PMI Values",
     id = "PMI_Page",
     sidebarPanel(h3('Step PMI'),
+                 p('Two significant figures are used for step yield ranges'),
                  uiOutput('uiOutpt_2'),
                  width = 9),
     mainPanel(grVizOutput('diagram'))

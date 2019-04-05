@@ -49,6 +49,10 @@ Once the calculation has been run, the plotted results will automatically be dis
  - Jun Li, Jacob Albrecht, Alina Borovika, and Martin D. Eastgate, "Evolving Green Chemistry Metrics into Predictive Tools for Decision Making and Benchmarking Analytics" *ACS Sustainable Chem. Eng.*, **2018** [10.1021/acssuschemeng.7b03407](https://dx.doi.org/10.1021/acssuschemeng.7b03407)
 
  -  Jun Li, Eric M. Simmons, and  Martin D. Eastgate, "A data-driven strategy for predicting greenness scores, rationally comparing synthetic routes and benchmarking PMI outcomes for the synthesis of molecules in the pharmaceutical industry" *Green Chemistry*, **2017** [10.1039/c6gc02359b](https://dx.doi.org/10.1039/c6gc02359b)
+ 
+## Update History
+
+ - April 2019: Reaction ranges updated with additional data
 
 ## Acknowledgements
 

@@ -9,7 +9,7 @@ library(ggplot2)
 library(mgcv) # for rmvn
 library(readxl)
 library(markdown)
-
+options(encoding = 'UTF-8')
 
 presets_file <- 'Presets.xlsx'
 

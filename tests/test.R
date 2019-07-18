@@ -1,3 +1,4 @@
+options(encoding='UTF-8')
 app <- ShinyDriver$new("../")
 app$snapshotInit("test")
 
@@ -9,7 +10,6 @@ app$setInputs(`stoich.high_2` = 2)
 app$setInputs(`stoich.high_3` = character(0))
 app$setInputs(`stoich.high_3` = 2)
 app$setInputs(inNavbar = "2. PMI Values")
-app$setInputs(mw_A = 1)
 app$setInputs(mw_A = 123)
 app$setInputs(mw_B = 123)
 app$setInputs(mw_C = 123)

@@ -9,7 +9,6 @@ library(ggplot2)
 library(mgcv) # for rmvn
 library(readxl)
 library(markdown)
-options(encoding = 'UTF-8')
 
 presets_file <- 'Presets.xlsx'
 
@@ -148,14 +147,19 @@ pmi.calc <- function(conv.df,
     quantile(x, probs = 0.95,na.rm =TRUE)
   })
   
+  soln.med <- apply(soln.mc, 1, function(x) {
+    quantile(x, probs = 0.50,na.rm =TRUE)
+  })
+  
   # dump data here for debuggin:
   #save.image(file="debug.RData")
   
   return(
     list(
       ranges = data.frame(
-        kg.per.kg.product.low = soln.low,
-        kg.per.kg.product.high = soln.high,
+        Bottom_5Pct = soln.low,
+        Median = soln.med,
+        Top_95Pct = soln.high,
         row.names = all.labs
       ),
       mc = soln.mc,
@@ -240,8 +244,8 @@ ui <- shinyUI(navbarPage(
           masses that are not chemical intermediates"),
         br(),
         textOutput("text2"),
-        plotOutput('ggdensity')
-        #tableOutput('tbl')
+        plotOutput('ggdensity'),
+        tableOutput('tbl')
       ),
       tabPanel("Step Yield vs Step PMI", plotOutput('yield.v.pmi'))
     ))

@@ -1,4 +1,5 @@
 <img src="ACSGCIPR.png" width=30% height=30%>
+[![Build Status](https://travis-ci.com/chepyle/PMI_Calculator.svg?branch=master)](https://travis-ci.com/chepyle/PMI_Calculator)
 
 # PMI Predictor
 

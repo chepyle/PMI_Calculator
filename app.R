@@ -172,10 +172,10 @@ pmi.calc <- function(conv.df,
 
 ui <- shinyUI(navbarPage(
   "PMI Calculator",
-  tabPanel("Information",
+  tabPanel("Information", id='info',
     fluidPage( withMathJax(includeMarkdown("README.md")))
            ),
-  tabPanel("1. Define Process",
+  tabPanel("1. Define Process", id = 'define_process',
            
            mainPanel(
              fluidRow(column(
@@ -212,7 +212,7 @@ ui <- shinyUI(navbarPage(
     mainPanel(grVizOutput('diagram'))
   ),
   tabPanel(
-    "3. Results",
+    "3. Results",id='results',
     sidebarPanel(
       p(" Press Calculate Button to Update Totals "),
       checkboxInput("advanced","Show Advanced Options"),
@@ -235,8 +235,8 @@ ui <- shinyUI(navbarPage(
       
     ),
     
-    mainPanel(tabsetPanel(
-      tabPanel("Overall PMI", plotOutput('OverallPMI')),
+    mainPanel(id = 'main',tabsetPanel(id='tabs',
+      tabPanel("Overall PMI", plotOutput('OverallPMI'),id='overall'),
       tabPanel(
         "Step Metrics",
         p("The plots below show the distribution of the intermediate compounds needed to produce
@@ -245,9 +245,10 @@ ui <- shinyUI(navbarPage(
         br(),
         textOutput("text2"),
         plotOutput('ggdensity'),
-        tableOutput('tbl')
+        #tableOutput('tbl')
+        id='metrics'
       ),
-      tabPanel("Step Yield vs Step PMI", plotOutput('yield.v.pmi'))
+      tabPanel("Step Yield vs Step PMI", plotOutput('yield.v.pmi'),id='yield_pmi')
     ))
   ),
   id = 'inNavbar'
@@ -376,6 +377,7 @@ server <- shinyServer(function(input, output, session) {
     df()[1]$ranges
   }, rownames = TRUE)
   
+  #exportTestValues(df = df())  # for automated testing
   
   output$ggdensity <- renderPlot({
     mcsamps <- df()[2]$mc

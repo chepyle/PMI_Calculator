@@ -1,5 +1,22 @@
 {
   "output": {
+    "diagram": {
+      "x": {
+        "diagram": "digraph {\n\ngraph [layout = \"dot\",\n       outputorder = \"edgesfirst\",\n       bgcolor = \"white\"]\n\nnode [fontname = \"Helvetica\",\n      fontsize = \"10\",\n      shape = \"circle\",\n      fixedsize = \"true\",\n      width = \"0.5\",\n      style = \"filled\",\n      fillcolor = \"aliceblue\",\n      color = \"gray70\",\n      fontcolor = \"gray50\"]\n\nedge [fontname = \"Helvetica\",\n     fontsize = \"8\",\n     len = \"1.5\",\n     color = \"gray80\",\n     arrowsize = \"0.5\"]\n\n  \"1\" [label = \"A\"] \n  \"2\" [label = \"B\"] \n  \"3\" [label = \"C\"] \n  \"4\" [label = \"D\"] \n  \"5\" [label = \"E\"] \n  \"1\"->\"2\" \n  \"2\"->\"4\" \n  \"3\"->\"4\" \n  \"4\"->\"5\" \n}",
+        "config": {
+          "engine": "dot",
+          "options": null
+        }
+      },
+      "evals": [
 
+      ],
+      "jsHooks": [
+
+      ],
+      "deps": [
+
+      ]
+    }
   }
 }

@@ -7,13 +7,15 @@ Thanks to the efforts of the American Chemical Society Green Chemistry Institute
 
 ## What is Process Mass Intensity?
 
-Process Mass Intensity (PMI) is a measure of a manufactruing process efficiency.  To make a desired chemical compound there are often several potential synthesis routes, but each route will have a different environmental impact.  One way to measure the possible environmental impact of a process is to consider the quantity of material that must be utilized to make the desired product.  PMI is this simple efficiency measure of the ratio of input material to final product:
+Process Mass Intensity (PMI) is a measure of a manufactruing process efficiency [^ref1] [^ref2].  To make a desired chemical compound there are often several potential synthesis routes, but each route will have a different environmental impact.  One way to measure the possible environmental impact of a process is to consider the quantity of material that must be utilized to make the desired product.  PMI is this simple efficiency measure of the ratio of input material to final product:
 
 \\[PMI = \frac{\sum{MassOfMaterials}}{MassOfIsolatedProduct}\\]
 
 Here \\(MassOfMaterials\\) includes the mass of process solvents, chemical reagents, and any other single-use consumables utilized in the process execution.  
 
-While PMI cannot distinguish the impact of the individual reagents and consumables used, it provides a simple and accessible means of discriminating among a set of potential processes. For a sequence of synthetic steps to make a final product, individual step PMI values may be used to determine the cumulative PMI for the entire route to the product.  When a chemist considers different retrosynthetic routes, they must depend on their experience to know which routes are most promising and should be tested in the laboratory. To augment the chemist's personal experience with the performance of past processes, a dataset containing nearly two thousand multi-kilo scale-up reactions was created. The majority of entries (1200) were provided by eleven major pharmaceutical and biotech companies (AstraZeneca, Boehringer Ingelheim, Bristol-Myers Squibb, Eli Lilly, Merck, Novartis, Pfizer, Roche, Amgen, Genentech) and a CDMO (Asymchem) via the ACS GCI pharma roundtable. Additionally, seven hundred eighty entries were extracted from journal [OPRD](https://pubs.acs.org/journal/oprdfk) published across past three decades and representing nearly seventy pharma and biotech companies.  By defining a sequence of reactions and their corresponding reaction type, it is possible to estimate a plausible PMI for any proposed or unoptimized chemical synthesis step as well as the cumulative PMI for the multi-step route using historical information.  This ability to virtually screen different prospective routes for efficiency allows process chemists to focus their resources on a few promising synthetic approaches.
+While PMI cannot distinguish the impact of the individual reagents and consumables used, it provides a simple and accessible means of discriminating among a set of potential processes. For a sequence of synthetic steps to make a final product, individual step PMI values may be used to determine the cumulative PMI for the entire route to the product.  When a chemist considers different retrosynthetic routes, they must depend on their experience to know which routes are most promising and should be tested in the laboratory. To augment the chemist's personal experience with the performance of past processes, a dataset containing nearly two thousand multi-kilo scale-up reactions was created. The majority of entries (1200) were provided by eleven major pharmaceutical and biotech companies (AstraZeneca, Boehringer Ingelheim, Bristol-Myers Squibb, Eli Lilly, Merck, Novartis, Pfizer, Roche, Amgen, Genentech) and a CDMO (Asymchem) via the ACS GCI pharma roundtable. Additionally, seven hundred eighty entries were extracted from journal [OPRD](https://pubs.acs.org/journal/oprdfk) published across past three decades and representing nearly seventy pharma and biotech companies.  By defining a sequence of reactions and their corresponding reaction type, it is possible to estimate a plausible PMI for any proposed or unoptimized chemical synthesis step as well as the cumulative PMI for the multi-step route using historical information.  This ability to virtually screen different prospective routes for efficiency allows process chemists to focus their resources on a few promising synthetic approaches.  
+
+To ensure holistic green-by-design process, the user of the PMI Predictor has also to take into account the greenness of reaction components that will be needed for each step. If the retrosynthesis requires use of highly toxic reagents or solvents, we recommend the user to select other disconnection strategies that do not require such reagents. Judicious selection of the most benign solvents and reagents, and subsequent process intensification further ensures green process development. Numerous greenness scorecards,[^ref3],[^ref4],[^ref5],[^ref6],[^ref7] solvent [^ref8] and reagent guides [^ref9] available for the process chemists that can guide further reduction of the environmental impact of the synthesis
 
 ## How to use this app: 
 
@@ -45,15 +47,11 @@ Once the calculation has been run, the plotted results will automatically be dis
 
  - **Step Yield vs Step PMI** Plots are generated to show the correlation between PMI and Yield for each of the reaction products.  Useful to explore the potential performance of individual reactions.
 
-## Reference
 
- - Jun Li, Jacob Albrecht, Alina Borovika, and Martin D. Eastgate, "Evolving Green Chemistry Metrics into Predictive Tools for Decision Making and Benchmarking Analytics" *ACS Sustainable Chem. Eng.*, **2018** [10.1021/acssuschemeng.7b03407](https://dx.doi.org/10.1021/acssuschemeng.7b03407)
-
- -  Jun Li, Eric M. Simmons, and  Martin D. Eastgate, "A data-driven strategy for predicting greenness scores, rationally comparing synthetic routes and benchmarking PMI outcomes for the synthesis of molecules in the pharmaceutical industry" *Green Chemistry*, **2017** [10.1039/c6gc02359b](https://dx.doi.org/10.1039/c6gc02359b)
- 
 ## Update History
 
  - April 2019: Reaction ranges updated with additional data
+ - July 2019: Expanded README and added Travis CI
 
 ## Acknowledgements
 
@@ -62,4 +60,20 @@ Once the calculation has been run, the plotted results will automatically be dis
 *app created by Jacob Albrecht, Bristol-Myers Squibb jacob.albrecht@bms.com*
 
 *app concept and design contributions from Jun Li, Alina Borovika, Martin Eastgate, Bristol-Myers Squibb*
+
+
+[^ref1]: Jun Li, Jacob Albrecht, Alina Borovika, and Martin D. Eastgate, "Evolving Green Chemistry Metrics into Predictive Tools for Decision Making and Benchmarking Analytics" *ACS Sustainable Chem. Eng.*, **2018** [10.1021/acssuschemeng.7b03407](https://dx.doi.org/10.1021/acssuschemeng.7b03407)
+
+[^ref2]: Jun Li, Eric M. Simmons, and  Martin D. Eastgate, "A data-driven strategy for predicting greenness scores, rationally comparing synthetic routes and benchmarking PMI outcomes for the synthesis of molecules in the pharmaceutical industry" *Green Chemistry*, **2017** [10.1039/c6gc02359b](https://dx.doi.org/10.1039/c6gc02359b)
+
+[^ref3]: Roschangar, F., Zhou, Y., Constable, D. J. C., Colberg, J., Dickson, D. P., Dunn, J. P., Eastgate, M. D., Gallou, F., Hayler, J. D., Koenig, S. G., Kopach, M. E., Leahy, D. K., Mergelsberg, I., Scholz, U., Smith, A. G., Henry, M., Mulder, J., Brandenburg, J., Dehli, J. R., Fandrick, D. R., Fandrick, K. R., Gnad-Badouin, F., Zerban, G., Groll, K., Anastas, P. T., Sheldon, R. A., Senanayake, C. H. Inspiring process innovation via an improved green manufacturing metric: iGAL. Green Chem. 20, 2206-2211(2018).
+[^ref4]: F. Roschangar and J. Colberg, Green Chemistry Metrics, in Green Techniques for Organic Synthesis and Medicinal Chemistry, ed. W. Zhang and B. W. Cue, John Wiley & Sons, Chichester, UK, 2018.
+[^ref5]: R. C. McElroy, A. Constantinou, L. C. Jones, L. Summerton and J. H. Clark. Towards a holistic approach to metrics for the 21st century pharmaceutical industry, Green Chem., 2015, 17, 3111-3121.
+[^ref6]: J. Andraos, M. L. Mastronardi, L. B. Hoch, A. Hent, Critical Evaluation of Published Algorithms for Determining Environmental and Hazard Impact Green Metrics of Chemical Reactions and Synthesis Plans, ACS Sustainable Chem. Eng. 2016, 4, 1934-1945.
+
+[^ref7]: Leahy, D. K., Simmons, E. M., Hung, V., Sweeney, J. T., Fleming, W. F., Miller, M. Design and evolution of the BMS process greenness scorecard. Green Chem., 2017, 19, 5163-5171.
+[^ref8]: Solvent selection guides and tools:
+http://learning.chem21.eu/methods-of-facilitating-change/tools-and-guides/solvent-selection-guides/guide-tables/,  https://www.acsgcipr.org/tools-for-innovation-in-chemistry/solvent-tool/
+[^ref9]: Reagent guides:
+https://reagents.acsgcipr.org/
 
